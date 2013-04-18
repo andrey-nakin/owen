@@ -4,12 +4,28 @@
 \usepackage{hyperref}
 
 \newcommand{\CMD}[1]{{\tt \hyperref[#1]{#1}}}
+\newcommand{\SEEALSO}{\subsubsection*{См. также}}
+\newcommand{\EXAMPLE}{\subsubsection*{Пример}}
+\newcommand{\PURPOSE}{\subsubsection*{Назначение}}
+\newcommand{\SYNTAX}[1]{\subsubsection*{Синтакс}{\tt #1}}
+\newcommand{\NOTES}{\subsubsection*{Примечание}}
+\newcommand{\ARGUMENTS}{\subsubsection*{Аргументы}}
+\newcommand{\RETURN}{\subsubsection*{Возвращаемое значение}}
+\newcommand{\NORETURN}{\subsubsection*{Возвращаемое значение} Отсутствует}
+\newcommand{\COMMAND}[1]{\subsection{#1}\label{#1}}
+\newcommand{\BEGINARGUMENTS}{\ARGUMENTS\begin{itemize}}
+\newcommand{\ENDARGUMENTS}{\end{itemize}}
+\newcommand{\NOARGUMENTS}{\ARGUMENTS Отсутствуют}
+\newcommand{\ARGUMENT}[1]{\item {\tt \mbox{#1}}~---}
+\newcommand{\DESCARGUMENT}{\ARGUMENT{desc} дескриптор, полученный командой \CMD{::owen::configure}.}
 
 \title{Библиотека OWEN \\ Реализация протокола ОВЕН на языке программирования Tcl \\ Руководство пользователя}
 
 \begin{document}
 
 \maketitle
+
+\tableofcontents
 
 \section{Общие сведения}
 
@@ -26,9 +42,7 @@
 
 \section{Описание библиотеки}
 
-\subsection{Принцип работы}
-
-\subsubsection{Дескриптор}
+\subsection{Дескриптор}
 
 Перед началом обмена с устройством необходимо создать {\it дескриптор} --- структура, описывающая параметры устройства, такие как адрес последовательного порта и его установки, адрес самого устройства, величина таймаута и пр. Дескриптор создаётся командой \CMD{::owen::configure}:
 
@@ -42,11 +56,11 @@ set dev [::owen::readString $desc DEV]
 
 Полученный дескриптор далее используется для обмена.
 
-\subsubsection{Использование порта}
+\subsection{Использование порта}
 
 Последовательный порт, по которому происходит обмен, открывается непосредственно перед передачей данных и закрывается сразу после получения ответа от устройства.
 
-\subsubsection{Информация об ошибке}
+\subsection{Информация об ошибке}
 
 Все команды обмена с устройством, которые возвращают какое-либо значение, в случае ошибки возвращают пустую строку без генерации исключительной ситуации. Чтобы узнать детальную информацию об ошибке, используются команды \CMD{:owen::lastStatus} и \CMD{::owen::lastError}.
 
@@ -69,5 +83,292 @@ set dev [::owen::readString $desc DEV]
 \end{itemize}
 
 Команда \CMD{::owen::lastError} возвращает детальное описание ошибки. Трактовки значения зависит от статуса, см. выше. В зависимости от статуса команда возвращает либо числовой код, либо текстовое описание ошибки.
+
+Информация об ошибке сохраняется в глобальной переменной, поэтому если производится работа с несколькими устройствами одновременно, нужно сохранять статус и ошибку в локальных переменных сразу после операции над каждый устройством.
+
+\section{Описание команд}
+
+\COMMAND{::owen::configure}
+
+\PURPOSE
+
+Создаёт дескриптор устройства по заданным параметрам. Не производит открытие или проверку существования последовательного порта.
+
+\SYNTAX{::owen::configure args}
+
+\BEGINARGUMENTS
+\ARGUMENT{args} Параметры устройства в виде пар <<параметр>>-<<значение>>. Список возможных параметров:
+
+\begin{itemize}
+\item {\tt -port} --- имя последовательного порта, по которому происходит обмен данными, например, <<{\tt COM1}>>.
+\item {\tt -settings} --- параметры последовательного порта в виде строки, например, <<{\tt 9600,8,n,1}>>.
+\item {\tt -timeout} --- таймаут ожидания ответа от устройства в мс, например, <<{\tt 500}>>.
+\item {\tt -numOfAttempts} --- число попыток связи с устройством в случае невозможности открыть порт или помех на линии, например, <<{\tt 3}>>.
+\item {\tt -addr} --- адрес устройства, например, <<{\tt 16}>>.
+\item {\tt -addrType} --- длина адреса: {\tt 0} --- 8 бит, {\tt 1} --- 11 бит. Можно использовать предопределённые константы {\tt ::owen::ADDR\_TYPE\_8BIT} и {\tt ::owen::ADDR\_TYPE\_11BIT}.
+\end{itemize}
+
+\ENDARGUMENTS
+
+\RETURN
+
+Дескриптор устройства.
+
+\EXAMPLE
+
+\begin{verbatim} 
+# устройство подключено к порту COM1
+# и 8-битный адрес 32
+set desc [::owen::configure -port COM1 -addr 32 -addrType 0]
+# в переменной desc - дескриптор
+\end{verbatim} 
+
+\COMMAND{::owen::lastStatus}
+
+\PURPOSE
+
+Возвращает статус последней произведённой операции. Обычно используется в паре с \CMD{::owen::lastError}
+
+\SYNTAX{::owen::lastStatus}
+
+\NOARGUMENTS
+
+\RETURN
+
+Целочисленное число с кодом статуса.
+
+\EXAMPLE
+
+\begin{verbatim}
+# создаём дескриптор
+set desc [::owen::configure -port COM1 -addr 32 -addrType 0]
+# считываем параметр DEV
+set dev [::owen::readString $desc DEV]
+# проверяем статус
+if { [::owen::lastStatus] != $::owen::STATUS_OK } {
+  error "Error reading DEV parameter"
+}
+\end{verbatim} 
+
+\SEEALSO
+\CMD{::owen::lastError}
+
+\COMMAND{::owen::lastError}
+
+\PURPOSE
+
+Возвращает описание ошибки от последней произведённой операции. Обычно используется в паре с \CMD{::owen::lastStatus}
+
+\SYNTAX{::owen::lastError}
+
+\NOARGUMENTS
+
+\RETURN
+
+Целочисленное число с кодом или текстовое описание ошибки. Трактовка кода ошибки зависит от статуса.
+
+\EXAMPLE
+
+\begin{verbatim}
+# создаём дескриптор
+set desc [::owen::configure -port COM1 -addr 32 -addrType 0]
+# считываем параметр DEV
+set dev [::owen::readString $desc DEV]
+# проверяем статус
+if { [::owen::lastStatus] != $::owen::STATUS_OK } {
+  error "Error [::lastError]"
+}
+\end{verbatim} 
+
+\SEEALSO
+\CMD{::owen::lastStatus}
+
+\COMMAND{::owen::sendCommand}
+
+\PURPOSE
+
+Отправляет команду устройству без ожидания ответа.
+
+\SYNTAX{::owen::sendCommand desc cmd}
+
+\BEGINARGUMENTS
+\DESCARGUMENT
+\ARGUMENT{cmd} строка с командой.
+\ENDARGUMENTS
+
+\NORETURN
+
+\EXAMPLE
+
+\begin{verbatim} 
+# создаём дескриптор
+set desc [::owen::configure -port COM1 -addr 32]
+# перезагрузим устройство
+::owen::sendCommand $desc INIT
+\end{verbatim} 
+
+\COMMAND{::owen::readString}
+
+\PURPOSE
+
+Считывает строковый параметр из устройства.
+
+\SYNTAX{::owen::readString desc parameter}
+
+\BEGINARGUMENTS
+\DESCARGUMENT
+\ARGUMENT{parameter} имя параметра.
+\ENDARGUMENTS
+
+\RETURN
+
+Значение параметра или пустая строка в случае ошибки.
+
+\EXAMPLE
+
+\begin{verbatim} 
+# создаём дескриптор
+set desc [::owen::configure -port COM1 -addr 32]
+# считывает тип устройства
+set dev [::owen::readString $desc DEV]
+\end{verbatim} 
+
+\COMMAND{::owen::readInt}
+
+\PURPOSE
+
+Считывает целочисленный параметр из устройства.
+
+\SYNTAX{::owen::readInt desc parameter ?index?}
+
+\BEGINARGUMENTS
+\DESCARGUMENT
+\ARGUMENT{parameter} имя параметра.
+\ARGUMENT{index} индекс параметра. Может отсутствовать, если параметр не имеет индекса.
+\ENDARGUMENTS
+
+\RETURN
+
+Значение параметра или пустая строка в случае ошибки.
+
+\EXAMPLE
+
+\begin{verbatim} 
+# создаём дескриптор
+set desc [::owen::configure -port COM1 -addr 32]
+# считываем адрес устройства
+set addr [::owen::readInt $desc ADDR]
+\end{verbatim} 
+
+\COMMAND{::owen::writeInt8}
+
+\PURPOSE
+
+Записывает целочисленный 8-битный параметр в устройство, после чего считывает и возвращает этот параметр.
+
+\SYNTAX{::owen::writeInt8 desc parameter index value}
+
+\BEGINARGUMENTS
+\DESCARGUMENT
+\ARGUMENT{parameter} имя параметра.
+\ARGUMENT{index} индекс параметра. Если параметр не имеет индекса, нужно указать {\tt -1}.
+\ARGUMENT{value} Значение параметра.
+\ENDARGUMENTS
+
+\RETURN
+
+Значение параметра или пустая строка в случае ошибки.
+
+\EXAMPLE
+
+\begin{verbatim} 
+# создаём дескриптор
+set desc [::owen::configure -port COM1 -addr 32]
+# время задержки
+set rsdl [::owen::writeInt8 $desc RSDL -1 20]
+\end{verbatim} 
+
+\COMMAND{::owen::writeInt16}
+
+\PURPOSE
+
+Записывает целочисленный 16-битный параметр в устройство, после чего считывает и возвращает этот параметр.
+
+\SYNTAX{::owen::writeInt8 desc parameter index value}
+
+\BEGINARGUMENTS
+\DESCARGUMENT
+\ARGUMENT{parameter} имя параметра.
+\ARGUMENT{index} индекс параметра. Если параметр не имеет индекса, нужно указать {\tt -1}.
+\ARGUMENT{value} Значение параметра.
+\ENDARGUMENTS
+
+\RETURN
+
+Значение параметра или пустая строка в случае ошибки.
+
+\EXAMPLE
+
+\begin{verbatim} 
+# создаём дескриптор
+set desc [::owen::configure -port COM1 -addr 32]
+# задаём новый адрес
+set addr [::owen::writeInt16 $desc ADDR -1 16]
+\end{verbatim} 
+
+\COMMAND{::owen::readFloat24}
+
+\PURPOSE
+
+Считывает числовой параметр в формате FLOAT24 из устройства.
+
+\SYNTAX{::owen::readFloat24 desc parameter ?index?}
+
+\BEGINARGUMENTS
+\DESCARGUMENT
+\ARGUMENT{parameter} имя параметра.
+\ARGUMENT{index} индекс параметра. Может отсутствовать, если параметр не имеет индекса.
+\ENDARGUMENTS
+
+\RETURN
+
+Значение параметра или пустая строка в случае ошибки.
+
+\EXAMPLE
+
+\begin{verbatim} 
+# создаём дескриптор
+set desc [::owen::configure -port COM1 -addr 32]
+# считываем уставку
+set setPoint [::owen::readFloat24 $desc SP 0]
+\end{verbatim} 
+
+\COMMAND{::owen::writeFloat24}
+
+\PURPOSE
+
+Записывает числовой параметр в формате FLOAT24 в устройство, после чего считывает и возвращает этот параметр.
+
+\SYNTAX{::owen::writeFloat24 desc parameter index value}
+
+\BEGINARGUMENTS
+\DESCARGUMENT
+\ARGUMENT{parameter} имя параметра.
+\ARGUMENT{index} индекс параметра. Если параметр не имеет индекса, нужно указать {\tt -1}.
+\ARGUMENT{value} Значение параметра.
+\ENDARGUMENTS
+
+\RETURN
+
+Значение параметра или пустая строка в случае ошибки.
+
+\EXAMPLE
+
+\begin{verbatim} 
+# создаём дескриптор
+set desc [::owen::configure -port COM1 -addr 32]
+# новая уставка
+set setPoint [::owen::writeFloat24 $desc SP 0 123.4]
+\end{verbatim} 
 
 \end{document}
